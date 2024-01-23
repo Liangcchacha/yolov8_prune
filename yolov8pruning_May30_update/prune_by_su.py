@@ -5,7 +5,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Load a model
-yolo = YOLO("runs/detect/constrained/weights/last.pt")  # build a new model from scratch
+yolo = YOLO("/mnt/c/wudi/code/yolov8_prune/runs/detect/train/weights/last.pt")  # build a new model from scratch
 model = yolo.model
 
 ws = []
@@ -36,7 +36,7 @@ def prune_conv(conv1: Conv, conv2: Conv):
         local_threshold = local_threshold * 0.5
     n = len(keep_idxs)
     # n = max(int(len(idxs) * 0.8), p)
-    print(n / len(gamma) * 100)
+    print(n / len(gamma) * 100)  # 求出裁剪的比例
     # scale = len(idxs) / n
     conv1.bn.weight.data = gamma[keep_idxs]
     conv1.bn.bias.data   = beta[keep_idxs]
@@ -46,12 +46,15 @@ def prune_conv(conv1: Conv, conv2: Conv):
     conv1.conv.weight.data = conv1.conv.weight.data[keep_idxs]
     conv1.conv.out_channels = n
     
-    if conv1.conv.bias is not None:
+    # 如果有bias，也要裁剪，一般有bn就不会有bias了,这里是为了防止没有bn的情况，更加通用
+    if conv1.conv.bias is not None:  
         conv1.conv.bias.data = conv1.conv.bias.data[keep_idxs]
 
+    # 如果conv2不是list，就转成list
     if not isinstance(conv2, list):
         conv2 = [conv2]
         
+    # 
     for item in conv2:
         if item is not None:
             if isinstance(item, Conv):
@@ -59,7 +62,7 @@ def prune_conv(conv1: Conv, conv2: Conv):
             else:
                 conv = item
             conv.in_channels = n
-            conv.weight.data = conv.weight.data[:, keep_idxs]
+            conv.weight.data = conv.weight.data[:, keep_idxs]  # 注意这里的索引位置
     
 def prune(m1, m2):
     if isinstance(m1, C2f):      # C2f as a top conv
